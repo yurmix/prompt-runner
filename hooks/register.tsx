@@ -45,7 +45,7 @@ export const register: Register = on => {
     await $.ui.focus({ requestId: PANE, key: 'game' }).catch(() => ({}))
 
     return {
-      text: 'Claude Run is open. Space or Up jumps, Down ducks, Esc returns to the prompt.',
+      text: 'Claude Run is open. Space jumps, and it is the only button. Esc returns to the prompt.',
     }
   })
 
