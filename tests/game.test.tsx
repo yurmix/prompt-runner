@@ -4,7 +4,8 @@ import { _internal } from '../hooks/runner.tsx'
 
 function beneath(on: On): void {
   mock.store(on)
-  on('session.start', () => ({}))
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('ui.message', () => ({}))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.close', () => ({ value: undefined }))
@@ -14,6 +15,30 @@ function beneath(on: On): void {
     return <Box />
   })
 }
+
+// A file system in memory beneath the plugin, for the keybindings file.
+function disk(on: On, files: Map<string, string>): string[] {
+  const toasts: string[] = []
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', ($, e) => ({ value: files.has(e.path) }))
+  on('fs.read', ($, e) => {
+    const text = files.get(e.path)
+    if (text === undefined) throw new Error(`ENOENT: ${e.path}`)
+    return { value: text }
+  })
+  on('fs.write', ($, e) => {
+    files.set(e.path, e.text)
+    return { value: undefined }
+  })
+  on('ui.toast', ($, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
+  return toasts
+}
+
+const KEYS = '/home/me/.claude/keybindings.json'
+const START = { cwd: '/work', surface: 'terminal', isInteractive: true } as const
 
 const BAND = {
   component: 'AbovePrompt',
@@ -148,4 +173,75 @@ test('every obstacle can be passed with the one button', () => {
       expect(ticks.some(at => survives(kind, speed, at))).toBe(true)
     }
   }
+})
+
+test('the first load binds ctrl+x g, and says so', async ($, on) => {
+  beneath(on)
+  const files = new Map<string, string>()
+  const toasts = disk(on, files)
+
+  await $.session.start(START)
+  expect(JSON.parse(files.get(KEYS) ?? '')).toEqual({
+    bindings: [{ context: 'Chat', bindings: { 'ctrl+x g': 'command:prompt-runner' } }],
+  })
+  expect(toasts.join(' ')).toMatch(/ctrl\+x g/)
+})
+
+test('the binding joins the bindings already there', async ($, on) => {
+  beneath(on)
+  const mine = {
+    bindings: [
+      { context: 'Global', bindings: { 'ctrl+k': 'app:toggleTodos' } },
+      { context: 'Chat', bindings: { 'ctrl+q': 'chat:stash' } },
+    ],
+  }
+  const files = new Map([[KEYS, JSON.stringify(mine)]])
+  disk(on, files)
+
+  await $.session.start(START)
+  expect(JSON.parse(files.get(KEYS) ?? '')).toEqual({
+    bindings: [
+      { context: 'Global', bindings: { 'ctrl+k': 'app:toggleTodos' } },
+      { context: 'Chat', bindings: { 'ctrl+q': 'chat:stash', 'ctrl+x g': 'command:prompt-runner' } },
+    ],
+  })
+})
+
+test('a key already taken is left alone', async ($, on) => {
+  beneath(on)
+  const taken = JSON.stringify({ bindings: [{ context: 'Chat', bindings: { 'ctrl+x g': 'chat:stash' } }] })
+  const files = new Map([[KEYS, taken]])
+  const toasts = disk(on, files)
+  await $.session.start(START)
+  expect(files.get(KEYS)).toBe(taken)
+  expect(toasts).toEqual([])
+})
+
+test('a binding of its own elsewhere is left alone', async ($, on) => {
+  beneath(on)
+  const own = JSON.stringify({ bindings: [{ context: 'Chat', bindings: { 'meta+g': 'command:prompt-runner' } }] })
+  const files = new Map([[KEYS, own]])
+  disk(on, files)
+  await $.session.start(START)
+  expect(files.get(KEYS)).toBe(own)
+})
+
+test('a keybindings file with comments is left alone', async ($, on) => {
+  beneath(on)
+  const commented = '{\n  // mine\n  "bindings": []\n}\n'
+  const files = new Map([[KEYS, commented]])
+  disk(on, files)
+  await $.session.start(START)
+  expect(files.get(KEYS)).toBe(commented)
+})
+
+test('a binding you removed stays removed', async ($, on) => {
+  beneath(on)
+  const files = new Map<string, string>()
+  disk(on, files)
+
+  await $.session.start(START)
+  files.set(KEYS, JSON.stringify({ bindings: [] }))
+  await $.session.start(START)
+  expect(JSON.parse(files.get(KEYS) ?? '')).toEqual({ bindings: [] })
 })
