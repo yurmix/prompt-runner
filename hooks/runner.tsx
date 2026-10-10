@@ -1,7 +1,8 @@
 import type { ClientModule, ClientSurface, RenderElement } from 'claude-code'
 
-// Claude Run: an endless runner drawn with half-block characters, so each
-// terminal cell holds two square-ish pixels (top and bottom).
+// Claude Run: a one-button endless runner drawn with half-block characters,
+// so each terminal cell holds two square-ish pixels (top and bottom). The
+// only move is a jump: tap anywhere on touch, or press Space on a keyboard.
 
 type Props = { best?: number; columns?: number; autoStart?: boolean }
 
@@ -15,7 +16,6 @@ type Game = {
   overAt: number
   jump: number // pixels above the ground
   vy: number
-  duck: number // ticks of ducking left
   speed: number
   dist: number
   score: number
@@ -54,8 +54,6 @@ const BODY_DEAD = ['.OOOOOO.', '.OROORO.', 'OOOOOOOO', '.OOOOOO.']
 const LEGS_A = ['.OO..OO.', '.O....O.']
 const LEGS_B = ['.OO..OO.', '..O..O..']
 const LEGS_AIR = ['.OO..OO.', '........']
-const DUCK_A = ['...OOOOOO.', '..OOOOKOKO', 'OOOOOOOOOO', '.O.O..O.O.']
-const DUCK_B = ['...OOOOOO.', '..OOOOKOKO', 'OOOOOOOOOO', '..O.O..O.O']
 
 const SPRITES: Record<Kind, string[][]> = {
   bug: [['R.RR.R', '.RRRR.', 'RRRRRR', '.R..R.']],
@@ -73,8 +71,8 @@ const SPRITES: Record<Kind, string[][]> = {
 const CLOUD = ['..cccc..', 'cccccccc']
 const CLOUD_W = 8
 
-const JUMP_KEYS = new Set([' ', 'space', 'up', 'w', 'k', 'return', 'enter'])
-const DUCK_KEYS = new Set(['down', 's', 'j'])
+// The one button: Space, however the host names it.
+const BUTTON_KEYS = new Set([' ', 'space'])
 
 function fresh(best: number): Game {
   return {
@@ -83,7 +81,6 @@ function fresh(best: number): Game {
     overAt: 0,
     jump: 0,
     vy: 0,
-    duck: 0,
     speed: 1.5,
     dist: 0,
     score: 0,
@@ -101,7 +98,6 @@ function start(g: Game, width: number): void {
   g.t = 0
   g.jump = 0
   g.vy = 0
-  g.duck = 0
   g.speed = 1.5
   g.dist = 0
   g.score = 0
@@ -119,7 +115,9 @@ function makeObstacle(kind: Kind, x: number): Obstacle {
   const art = SPRITES[kind][0] ?? []
   const w = art[0]?.length ?? 0
   const hgt = art.length
-  const top = kind === 'moth' ? 5 : kind === 'mothHigh' ? 1 : FEET - hgt + 1
+  // A low moth skims the ground, so jump it like a bug. A high moth flies
+  // over a running Claude but meets a jumping one, so don't press.
+  const top = kind === 'moth' ? FEET - hgt : kind === 'mothHigh' ? 1 : FEET - hgt + 1
   return { kind, x, top, w, hgt }
 }
 
@@ -132,7 +130,6 @@ function pickKind(g: Game): Kind {
 }
 
 function avatarBox(g: Game): [number, number, number, number] {
-  if (g.duck > 0 && g.jump <= 0) return [AV_X + 1, FEET - 3, AV_X + 9, FEET]
   const bottom = Math.round(FEET - g.jump)
   return [AV_X + 1, bottom - 5, AV_X + 6, bottom]
 }
@@ -147,15 +144,7 @@ function hits(g: Game, o: Obstacle): boolean {
 }
 
 function jump(g: Game): void {
-  if (g.jump <= 0 && g.vy === 0) {
-    g.vy = JUMP_V
-    g.duck = 0
-  }
-}
-
-function duck(g: Game): void {
-  g.duck = 10
-  if (g.jump > 0) g.vy = Math.min(g.vy, -1.6) // drop out of the air faster
+  if (g.jump <= 0 && g.vy === 0) g.vy = JUMP_V
 }
 
 function step(g: Game, width: number): void {
@@ -171,7 +160,6 @@ function step(g: Game, width: number): void {
       g.vy = 0
     }
   }
-  if (g.duck > 0) g.duck--
 
   // World
   g.speed = Math.min(3.6, 1.5 + g.score / 600)
@@ -233,9 +221,6 @@ function blit(c: Pixels, art: string[], x: number, y: number): void {
 function avatarArt(g: Game): { art: string[]; y: number } {
   if (g.mode === 'over') {
     return { art: [...BODY_DEAD, ...LEGS_AIR], y: Math.round(FEET - g.jump) - 5 }
-  }
-  if (g.duck > 0 && g.jump <= 0) {
-    return { art: Math.floor(g.t / 3) % 2 ? DUCK_A : DUCK_B, y: FEET - 3 }
   }
   const blink = g.mode === 'idle' && g.t % 90 < 4
   const body = blink ? BODY_BLINK : BODY
@@ -324,8 +309,8 @@ function draw(g: Game, width: number, surface: ClientSurface<Game>): RenderEleme
     const rows = rowsOf(c)
     const hint =
       width >= 70
-        ? 'Click or tap here to play. Space or Up jumps, Down ducks.'
-        : 'Tap to play · Space jumps · Down ducks'
+        ? 'Tap or press Space to play. One button: jump.'
+        : 'Tap or Space to play and jump'
     return (
       <Box flexDirection="row">
         <Box flexDirection="column">
@@ -350,10 +335,8 @@ function draw(g: Game, width: number, surface: ClientSurface<Game>): RenderEleme
     g.mode === 'over'
       ? width >= 60
         ? 'GAME OVER · tap or press Space to run again'
-        : 'GAME OVER · Space to retry'
-      : width >= 72
-        ? 'Space/Up jump · Down duck · tap high to jump, low to duck'
-        : 'Space jump · Down duck'
+        : 'GAME OVER · tap or Space'
+      : 'Tap or Space to jump'
 
   return (
     <Box flexDirection="column" width={width}>
@@ -383,7 +366,8 @@ const Runner: ClientModule<Props, Game> = (props, surface) => {
     if (props?.autoStart) start(g, width)
     s.setState(g)
 
-    const act = (kind: 'jump' | 'duck'): void => {
+    // The one button: start, jump, or run again.
+    const press = (): void => {
       const cur = s.state
       if (!cur) return
       const w = Math.max(30, s.columns > 0 ? s.columns : 60)
@@ -392,10 +376,8 @@ const Runner: ClientModule<Props, Game> = (props, surface) => {
       } else if (cur.mode === 'over') {
         if (cur.t - cur.overAt < 8) return // ignore the press that was mid-flight
         start(cur, w)
-      } else if (kind === 'jump') {
-        jump(cur)
       } else {
-        duck(cur)
+        jump(cur)
       }
       s.setState({ ...cur })
     }
@@ -422,15 +404,11 @@ const Runner: ClientModule<Props, Game> = (props, surface) => {
 
     s.onKey(ev => {
       if (ev.ctrl || ev.meta) return
-      const k = ev.key.toLowerCase()
-      if (JUMP_KEYS.has(k)) act('jump')
-      else if (DUCK_KEYS.has(k)) act('duck')
+      if (BUTTON_KEYS.has(ev.key.toLowerCase())) press()
     })
 
     s.onPointer(ev => {
-      if (ev.type !== 'down') return
-      // Row 0 is the score line; the field's lower half is where Claude runs.
-      act(ev.y >= 4 ? 'duck' : 'jump')
+      if (ev.type === 'down') press() // a tap or click anywhere
     })
   }
 
@@ -441,4 +419,4 @@ const Runner: ClientModule<Props, Game> = (props, surface) => {
 export default Runner
 
 // Exposed for tests.
-export const _internal = { fresh, start, step, jump, duck, hits, makeObstacle, FEET }
+export const _internal = { fresh, start, step, jump, hits, makeObstacle, FEET }

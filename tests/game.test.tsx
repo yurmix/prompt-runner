@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
+import { _internal } from '../hooks/runner.tsx'
 
 function beneath(on: On): void {
   mock.store(on)
@@ -46,7 +47,7 @@ test('the band idles, starts on Space, ends on a crash and keeps the best score'
 
     // Space right after the crash is ignored; a later press runs again.
     await ui.advance(1_000)
-    await ui.key({ key: 'up', in: 'game' })
+    await ui.key({ key: ' ', in: 'game' })
     await ui.advance(200)
     expect(await ui.find({ in: 'game', text: /GAME OVER/ })).toBeUndefined()
 
@@ -63,6 +64,53 @@ test('a tap starts the game', async ($, on) => {
   await ui.advance(200)
   expect(await ui.find({ in: 'game', text: /HI \d{5}/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('Space is the only key', async ($, on) => {
+  beneath(on)
+
+  const ui = await $.ui.mount({ plugin: 'prompt-runner', surface: 'terminal', ...BAND })
+  await ui.resize({ columns: 80, rows: 8, in: 'game' })
+  for (const key of ['up', 'down', 'w', 's', 'k', 'j']) await ui.key({ key, in: 'game' })
+  await ui.advance(200)
+  expect(await ui.find({ in: 'game', text: /HI \d{5}/ })).toBeUndefined()
+  await ui.key({ key: ' ', in: 'game' })
+  await ui.advance(200)
+  expect(await ui.find({ in: 'game', text: /HI \d{5}/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('every obstacle can be passed with the one button', () => {
+  const { fresh, start, step, jump, makeObstacle } = _internal
+  const WIDTH = 80
+
+  // Run one obstacle at Claude, pressing at tick `at` (or never), and say
+  // whether Claude got past it.
+  const survives = (kind: Parameters<typeof makeObstacle>[0], speed: number, at: number | null): boolean => {
+    const g = fresh(0)
+    start(g, WIDTH)
+    g.gap = Infinity
+    g.dist = (speed - 1.5) * 600 * 4 // the score that sets this speed
+    g.obs = [makeObstacle(kind, 60)]
+    for (let t = 0; t < 200; t++) {
+      if (t === at) jump(g)
+      step(g, WIDTH)
+      if (g.mode === 'over') return false
+      if (g.obs.length === 0) return true
+    }
+    return true
+  }
+
+  // Swarms only show up once the speed passes 2.2.
+  for (const speed of [1.5, 2.3, 3.6]) {
+    expect(survives('mothHigh', speed, null)).toBe(true)
+    for (const kind of ['bug', 'bugs', 'stack', 'moth'] as const) {
+      if (kind === 'bugs' && speed <= 2.2) continue
+      expect(survives(kind, speed, null)).toBe(false)
+      const ticks = Array.from({ length: 60 }, (_, i) => i)
+      expect(ticks.some(at => survives(kind, speed, at))).toBe(true)
+    }
+  }
 })
 
 test('surfaces without a Client keep their own band', async ($, on) => {
@@ -108,7 +156,7 @@ test('the play pane starts running at once', async ($, on) => {
     await ui.resize({ columns: 80, rows: 8, in: 'game' })
     await ui.advance(200)
     expect(await ui.find({ in: 'game', text: /HI \d{5}/ })).toBeDefined()
-    await ui.key({ key: 'up', in: 'game' })
+    await ui.key({ key: ' ', in: 'game' })
     await ui.advance(200)
     expect(await ui.find({ in: 'game', text: /GAME OVER/ })).toBeUndefined()
     await ui.unmount()

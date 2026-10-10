@@ -1,6 +1,6 @@
 # Claude Run
 
-An endless-runner game for Claude Code. It's like the browser's offline dinosaur game, but you play as a pixel Claude. Claude waits in the empty strip above your prompt. Jump over bugs and stacks of failing tests, and duck under the hallucination moths.
+A one-button endless-runner game for Claude Code. It's like the browser's offline dinosaur game, but you play as a pixel Claude. Claude waits in the empty strip above your prompt. The only move is a jump: jump over bugs and stacks of failing tests, and time it so you don't jump into a hallucination moth.
 
 ```
  ▄▄▄▄                                          HI 00412  00187
@@ -23,13 +23,16 @@ Answer `y` to add the marketplace, then press Enter to pick the user scope. The 
 
 ## Play
 
-| Where | Start | Jump | Duck |
-| --- | --- | --- | --- |
-| Desktop app (Code tab) | Click or tap the strip above the prompt | Space, Up, W, or tap the top half | Down, S, or tap the bottom half |
-| Terminal, with a mouse | Click the strip above the prompt | Space, Up, W, K | Down, S, J |
-| Terminal, keyboard only | Run `/prompt-runner` | Space, Up, W, K | Down, S, J |
+There is one button. It starts a run, jumps, and starts the next run after a crash.
 
-At an empty prompt, Up already scrolls back through your history. So in the terminal the game only takes keys after you click it or run `/prompt-runner`. That command opens the game in a focused pane, and Esc hands the keyboard back to your prompt.
+| Where | The button |
+| --- | --- |
+| Touch screen | Tap anywhere on the game |
+| Desktop app (Code tab) | Space, or click anywhere on the game |
+| Terminal, with a mouse | Click the strip above the prompt, then Space or click |
+| Terminal, keyboard only | Run `/prompt-runner`, then Space |
+
+At an empty prompt, Space types a space. So in the terminal the game only takes keys after you click it or run `/prompt-runner`. That command opens the game in a focused pane, and Esc hands the keyboard back to your prompt.
 
 Other commands:
 
@@ -43,7 +46,7 @@ Your best score is saved between sessions.
 - **Bug**: a small red bug. Jump over it.
 - **Bug swarm**: two bugs together. They start showing up once you're running fast.
 - **Failing test stack**: a grey stack, taller than a bug.
-- **Hallucination moth**: a purple moth. A low one flies at head height, so duck. A high one flies over you, so don't jump into it.
+- **Hallucination moth**: a purple moth. A low one skims the ground, so jump it like a bug. A high one flies over you, so don't jump until it has passed.
 
 The game speeds up as you go, and the score flashes at every 100.
 
