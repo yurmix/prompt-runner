@@ -5,6 +5,12 @@ const isPlaying = atom({ plugin: 'prompt-runner', key: 'isPlaying' } as const, f
 const best = atom({ plugin: 'prompt-runner', key: 'best' } as const, 0)
 
 const PANE = 'prompt-runner'
+const FOCUS_TRIES = 10
+const FOCUS_EVERY_MS = 100
+
+function openGame($: EngineInterface): Promise<unknown> {
+  return $.ui.open({ id: PANE, title: 'Claude Run', focus: true, closeOnEscape: true, rows: 8 })
+}
 
 // The shortcut the plugin binds for you, once, in ~/.claude/keybindings.json.
 const KEY = 'ctrl+x g'
@@ -81,8 +87,18 @@ export const register: Register = on => {
     }
 
     await update($, isPlaying, () => true)
-    await $.ui.open({ id: PANE, title: 'Claude Run', focus: true, closeOnEscape: true, rows: 8 })
-    await $.ui.focus({ requestId: PANE, key: 'game' }).catch(() => ({}))
+    await openGame($)
+    // The surface hands a pane the keyboard only over an empty prompt, and the
+    // prompt may still hold the command as it runs. Ask again for a moment
+    // after this answer, until the pane has the keys.
+    void (async () => {
+      for (let i = 0; i < FOCUS_TRIES; i++) {
+        await $.clock.sleep(FOCUS_EVERY_MS)
+        const pane = (await $.ui.panes()).find(p => p.id === PANE)
+        if (!pane || pane.isFocused) return
+        await openGame($)
+      }
+    })().catch(() => {})
 
     return { text: 'Claude Run is open. Space or a tap jumps. Esc puts it away.' }
   })
@@ -105,7 +121,7 @@ export const register: Register = on => {
         key="game"
         module="./runner.tsx"
         width={e.props.bodyColumns}
-        props={{ best: top, columns: e.props.bodyColumns, autoStart: true }}
+        props={{ best: top, columns: e.props.bodyColumns, autoStart: true, focused: e.props.isFocused }}
       />
     )
   })

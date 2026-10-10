@@ -245,3 +245,44 @@ test('a binding you removed stays removed', async ($, on) => {
   await $.session.start(START)
   expect(JSON.parse(files.get(KEYS) ?? '')).toEqual({ bindings: [] })
 })
+
+test('without the keyboard the game pauses and says how to get it', async ($, on) => {
+  beneath(on)
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({
+      plugin: 'prompt-runner',
+      surface,
+      ...PANE,
+      props: { ...PANE.props, isFocused: false },
+    })
+    await ui.resize({ columns: 80, rows: 8, in: 'game' })
+    await ui.advance(30_000)
+    expect(await ui.find({ in: 'game', text: /PAUSED/ })).toBeDefined()
+    expect(await ui.find({ in: 'game', text: /ctrl\+x tab/ })).toBeDefined()
+    expect(await ui.find({ in: 'game', text: /GAME OVER/ })).toBeUndefined()
+    await ui.unmount()
+  }
+})
+
+test('/prompt-runner keeps asking for the keyboard until the pane has it', async ($, on) => {
+  mock.store(on)
+  const clock = mock.clock(on)
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('command.register', ($, e) => ({ value: { command: e.name } }))
+  on('ui.close', () => ({ value: undefined }))
+  let opens = 0
+  on('ui.open', () => {
+    opens++
+    return { value: { isPlaced: true } }
+  })
+  // The prompt refuses the first two requests, then the pane has the keys.
+  on('ui.panes', () => ({
+    value: [{ id: 'prompt-runner', title: 'Claude Run', isShown: true, isFocused: opens >= 3, isPlaced: true }],
+  }))
+
+  await $.command.run({ command: 'prompt-runner', args: '' })
+  expect(opens).toBe(1)
+  await clock.advance(2_000)
+  expect(opens).toBe(3)
+})
