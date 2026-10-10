@@ -34,7 +34,11 @@ Your best score is saved between sessions.
 
 ### Open it with one key
 
-To open and close the game with a shortcut instead of typing the command, add a binding to `~/.claude/keybindings.json`. This one uses `ctrl+x g`, which Claude Code doesn't use for anything else:
+The first time the plugin loads, it binds `ctrl+x g` to `/prompt-runner` in `~/.claude/keybindings.json` and shows a short notice. Claude Code doesn't use `ctrl+x g` for anything else. After that, `ctrl+x g` opens the game and closes it again.
+
+It leaves your file alone if `ctrl+x g` is already taken, if you've already bound `/prompt-runner` to another key, or if the file isn't plain JSON (it has comments, for example). It only tries once, so if you remove or change the binding, it stays the way you left it.
+
+To bind it yourself, or to pick another key, add this to `~/.claude/keybindings.json`:
 
 ```json
 {
@@ -47,7 +51,7 @@ To open and close the game with a shortcut instead of typing the command, add a 
 }
 ```
 
-If the file already has a `bindings` list, add the block to it. Any free key works. `ctrl+d` doesn't, because Claude Code reserves it for exit.
+If the file already has a `bindings` list, add the block to it. `ctrl+d` won't work, because Claude Code reserves it for exit.
 
 ## Obstacles
 
