@@ -1,6 +1,6 @@
 # Claude Run
 
-A one-button endless-runner game for Claude Code. It's like the browser's offline dinosaur game, but you play as a pixel Claude. Claude waits in the empty strip above your prompt. The only move is a jump: jump over bugs and stacks of failing tests, and time it so you don't jump into a hallucination moth.
+A one-button endless-runner game for Claude Code. It's like the browser's offline dinosaur game, but you play as a pixel Claude. It stays hidden until you call it up, for example while Claude works through a long prompt. The only move is a jump: jump over bugs and stacks of failing tests, and time it so you don't jump into a hallucination moth.
 
 ```
  ▄▄▄▄                                          HI 00412  00187
@@ -19,27 +19,35 @@ Type this at the prompt of a Claude Code terminal session:
 /plugin install prompt-runner --marketplace yurmix/prompt-runner
 ```
 
-Answer `y` to add the marketplace, then press Enter to pick the user scope. The game is active right away, and it also shows up in the desktop app's Code tab.
+Answer `y` to add the marketplace, then press Enter to pick the user scope. The plugin is active right away, in the terminal and in the desktop app's Code tab.
 
 ## Play
 
-There is one button. It starts a run, jumps, and starts the next run after a crash.
+Run `/prompt-runner` to open the game, even while Claude is working. Run it again, or press Esc, to put the game away and get your prompt back.
 
-| Where | The button |
-| --- | --- |
-| Touch screen | Tap anywhere on the game |
-| Desktop app (Code tab) | Space, or click anywhere on the game |
-| Terminal, with a mouse | Click the strip above the prompt, then Space or click |
-| Terminal, keyboard only | Run `/prompt-runner`, then Space |
+Once the game is open, there is one button. It jumps, and it starts the next run after a crash.
 
-At an empty prompt, Space types a space. So in the terminal the game only takes keys after you click it or run `/prompt-runner`. That command opens the game in a focused pane, and Esc hands the keyboard back to your prompt.
-
-Other commands:
-
-- `/prompt-runner hide` removes the strip above the prompt.
-- `/prompt-runner show` brings it back.
+- **Keyboard:** Space
+- **Mouse or touch:** click or tap anywhere on the game
 
 Your best score is saved between sessions.
+
+### Open it with one key
+
+To open and close the game with a shortcut instead of typing the command, add a binding to `~/.claude/keybindings.json`. This one uses `ctrl+x g`, which Claude Code doesn't use for anything else:
+
+```json
+{
+  "bindings": [
+    {
+      "context": "Chat",
+      "bindings": { "ctrl+x g": "command:prompt-runner" }
+    }
+  ]
+}
+```
+
+If the file already has a `bindings` list, add the block to it. Any free key works. `ctrl+d` doesn't, because Claude Code reserves it for exit.
 
 ## Obstacles
 
@@ -52,7 +60,7 @@ The game speeds up as you go, and the score flashes at every 100.
 
 ## Where it runs
 
-The game uses the Claude Code plugin API's `Client` element, which only the terminal and the Claude desktop app draw. On the mobile app and VS Code, the strip above the prompt stays as it was.
+The game uses the Claude Code plugin API's `Client` element, which only the terminal and the Claude desktop app draw. On the mobile app and VS Code, `/prompt-runner` opens a note saying so instead.
 
 ## Development
 
@@ -61,7 +69,7 @@ claude plugin validate .
 claude plugin test .
 ```
 
-`hooks/register.tsx` is the hooks module. It places the game above the prompt, adds the `/prompt-runner` command, and keeps the best score. `hooks/runner.tsx` is the game itself, drawn with half-block characters so each terminal cell holds two pixels.
+`hooks/register.tsx` is the hooks module. It adds the `/prompt-runner` command, opens and closes the game's pane, and keeps the best score. `hooks/runner.tsx` is the game itself, drawn with half-block characters so each terminal cell holds two pixels.
 
 ## License
 

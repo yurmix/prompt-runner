@@ -6,6 +6,9 @@ function beneath(on: On): void {
   mock.store(on)
   on('session.start', () => ({}))
   on('ui.message', () => ({}))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.close', () => ({ value: undefined }))
+  on('ui.focus', () => ({ value: {} }))
   on('ui.render', ($, e) => {
     const { Box } = $.ui.resolve(e)
     return <Box />
@@ -16,7 +19,7 @@ const BAND = {
   component: 'AbovePrompt',
   props: {
     hasSurvey: false,
-    isWorking: false,
+    isWorking: true,
     maxRows: 12,
     bodyColumns: 80,
     scroll: { offset: 0, bodyRows: 12 },
@@ -24,17 +27,46 @@ const BAND = {
   },
 } as const
 
-test('the band idles, starts on Space, ends on a crash and keeps the best score', async ($, on) => {
+const PANE = {
+  component: 'Pane',
+  requestId: 'prompt-runner',
+  props: {
+    title: 'Claude Run',
+    isFocused: true,
+    bodyColumns: 80,
+    placement: 'inline',
+    scroll: { offset: 0, bodyRows: 8 },
+    view: {},
+  },
+} as const
+
+test('the game stays out of the way until it is asked for', async ($, on) => {
+  beneath(on)
+
+  for (const surface of ['terminal', 'desktop', 'mobile', 'vscode'] as const) {
+    const ui = await $.ui.mount({ plugin: 'prompt-runner', surface, ...BAND })
+    expect(await ui.find({ type: 'Client' })).toBeUndefined()
+    await ui.unmount()
+  }
+})
+
+test('/prompt-runner opens the game, and again puts it away', async ($, on) => {
+  beneath(on)
+
+  const opened = await $.command.run({ command: 'prompt-runner', args: '' })
+  expect(opened.text).toMatch(/is open/)
+  const closed = await $.command.run({ command: 'prompt-runner', args: '' })
+  expect(closed.text).toMatch(/put away/)
+  const reopened = await $.command.run({ command: 'prompt-runner', args: '' })
+  expect(reopened.text).toMatch(/is open/)
+})
+
+test('the game runs at once, ends on a crash and keeps the best score', async ($, on) => {
   beneath(on)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'prompt-runner', surface, ...BAND })
+    const ui = await $.ui.mount({ plugin: 'prompt-runner', surface, ...PANE })
     await ui.resize({ columns: 80, rows: 8, in: 'game' })
-
-    expect(await ui.find({ type: 'Client', key: 'game' })).toBeDefined()
-    expect(await ui.find({ in: 'game', text: /Claude Run/ })).toBeDefined()
-
-    await ui.key({ key: ' ', in: 'game' })
     await ui.advance(400)
     expect(await ui.find({ in: 'game', text: /HI \d{5}/ })).toBeDefined()
 
@@ -45,7 +77,7 @@ test('the band idles, starts on Space, ends on a crash and keeps the best score'
     // The score reached the hooks module, which hands the best back as HI.
     expect(await ui.find({ in: 'game', text: /HI (?!00000)\d{5}/ })).toBeDefined()
 
-    // Space right after the crash is ignored; a later press runs again.
+    // Space runs again.
     await ui.advance(1_000)
     await ui.key({ key: ' ', in: 'game' })
     await ui.advance(200)
@@ -55,28 +87,33 @@ test('the band idles, starts on Space, ends on a crash and keeps the best score'
   }
 })
 
-test('a tap starts the game', async ($, on) => {
+test('a tap runs again after a crash', async ($, on) => {
   beneath(on)
 
-  const ui = await $.ui.mount({ plugin: 'prompt-runner', surface: 'desktop', ...BAND })
-  await ui.resize({ columns: 80, rows: 4, in: 'game' })
-  await ui.pointer({ type: 'down', x: 20, y: 1, button: 'left', in: 'game' })
+  const ui = await $.ui.mount({ plugin: 'prompt-runner', surface: 'desktop', ...PANE })
+  await ui.resize({ columns: 80, rows: 8, in: 'game' })
+  await ui.advance(30_000)
+  expect(await ui.find({ in: 'game', text: /GAME OVER/ })).toBeDefined()
+  await ui.advance(1_000)
+  await ui.pointer({ type: 'down', x: 20, y: 5, button: 'left', in: 'game' })
   await ui.advance(200)
-  expect(await ui.find({ in: 'game', text: /HI \d{5}/ })).toBeDefined()
+  expect(await ui.find({ in: 'game', text: /GAME OVER/ })).toBeUndefined()
   await ui.unmount()
 })
 
 test('Space is the only key', async ($, on) => {
   beneath(on)
 
-  const ui = await $.ui.mount({ plugin: 'prompt-runner', surface: 'terminal', ...BAND })
+  const ui = await $.ui.mount({ plugin: 'prompt-runner', surface: 'terminal', ...PANE })
   await ui.resize({ columns: 80, rows: 8, in: 'game' })
+  await ui.advance(30_000)
+  await ui.advance(1_000)
   for (const key of ['up', 'down', 'w', 's', 'k', 'j']) await ui.key({ key, in: 'game' })
   await ui.advance(200)
-  expect(await ui.find({ in: 'game', text: /HI \d{5}/ })).toBeUndefined()
+  expect(await ui.find({ in: 'game', text: /GAME OVER/ })).toBeDefined()
   await ui.key({ key: ' ', in: 'game' })
   await ui.advance(200)
-  expect(await ui.find({ in: 'game', text: /HI \d{5}/ })).toBeDefined()
+  expect(await ui.find({ in: 'game', text: /GAME OVER/ })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -110,55 +147,5 @@ test('every obstacle can be passed with the one button', () => {
       const ticks = Array.from({ length: 60 }, (_, i) => i)
       expect(ticks.some(at => survives(kind, speed, at))).toBe(true)
     }
-  }
-})
-
-test('surfaces without a Client keep their own band', async ($, on) => {
-  beneath(on)
-
-  for (const surface of ['mobile', 'vscode'] as const) {
-    const ui = await $.ui.mount({ plugin: 'prompt-runner', surface, ...BAND })
-    expect(await ui.find({ type: 'Client' })).toBeUndefined()
-    await ui.unmount()
-  }
-})
-
-test('/prompt-runner hide and show toggle the strip', async ($, on) => {
-  beneath(on)
-
-  const hidden = await $.command.run({ command: 'prompt-runner', args: 'hide' })
-  expect(hidden.text).toMatch(/hidden/)
-  const ui = await $.ui.mount({ plugin: 'prompt-runner', surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Client' })).toBeUndefined()
-  await ui.unmount()
-
-  const shown = await $.command.run({ command: 'prompt-runner', args: 'show' })
-  expect(shown.text).toMatch(/above the prompt/)
-})
-
-test('the play pane starts running at once', async ($, on) => {
-  beneath(on)
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({
-      plugin: 'prompt-runner',
-      surface,
-      component: 'Pane',
-      requestId: 'prompt-runner',
-      props: {
-        title: 'Claude Run',
-        isFocused: true,
-        bodyColumns: 80,
-        placement: 'inline',
-        scroll: { offset: 0, bodyRows: 8 },
-        view: {},
-      },
-    })
-    await ui.resize({ columns: 80, rows: 8, in: 'game' })
-    await ui.advance(200)
-    expect(await ui.find({ in: 'game', text: /HI \d{5}/ })).toBeDefined()
-    await ui.key({ key: ' ', in: 'game' })
-    await ui.advance(200)
-    expect(await ui.find({ in: 'game', text: /GAME OVER/ })).toBeUndefined()
-    await ui.unmount()
   }
 })
