@@ -4,7 +4,7 @@ import type { ClientModule, ClientSurface, RenderElement } from 'claude-code'
 // so each terminal cell holds two square-ish pixels (top and bottom). The
 // only move is a jump: tap anywhere on touch, or press Space on a keyboard.
 
-type Props = { best?: number; columns?: number; autoStart?: boolean }
+type Props = { best?: number; columns?: number; autoStart?: boolean; focused?: boolean }
 
 type Kind = 'bug' | 'bugs' | 'stack' | 'moth' | 'mothHigh'
 type Obstacle = { kind: Kind; x: number; top: number; w: number; hgt: number }
@@ -25,6 +25,7 @@ type Game = {
   clouds: Cloud[]
   gap: number
   flash: number
+  away: boolean // the keyboard is elsewhere, so the run waits
 }
 
 const TICK_MS = 40
@@ -90,6 +91,7 @@ function fresh(best: number): Game {
     clouds: [],
     gap: 0,
     flash: 0,
+    away: false,
   }
 }
 
@@ -336,12 +338,16 @@ function draw(g: Game, width: number, surface: ClientSurface<Game>): RenderEleme
       ? width >= 60
         ? 'GAME OVER · tap or press Space to run again'
         : 'GAME OVER · tap or Space'
-      : 'Tap or Space to jump'
+      : g.away
+        ? width >= 60
+          ? 'PAUSED · click here or press ctrl+x tab to play'
+          : 'PAUSED · click or ctrl+x tab'
+        : 'Tap or Space to jump'
 
   return (
     <Box flexDirection="column" width={width}>
       <Box flexDirection="row" justifyContent="space-between">
-        {g.mode === 'over' ? (
+        {g.mode === 'over' || g.away ? (
           <Text bold color="claude" wrap="truncate-end">{left}</Text>
         ) : (
           <Text dimColor wrap="truncate-end">{left}</Text>
@@ -387,6 +393,7 @@ const Runner: ClientModule<Props, Game> = (props, surface) => {
       if (!cur) return
       const w = Math.max(30, s.columns > 0 ? s.columns : 60)
       const wasRunning = cur.mode === 'run'
+      if (wasRunning && cur.away) return // wait for the keyboard to come back
       step(cur, w)
       if (cur.mode === 'run') {
         s.setState({ ...cur })
@@ -413,6 +420,8 @@ const Runner: ClientModule<Props, Game> = (props, surface) => {
   }
 
   if (known > g.best) g.best = known
+  // Without the keyboard, Space would land in the prompt, so pause the run.
+  g.away = props?.focused === false
   return draw(g, width, surface)
 }
 

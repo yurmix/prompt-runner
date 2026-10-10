@@ -25,10 +25,14 @@ Answer `y` to add the marketplace, then press Enter to pick the user scope. The 
 
 Run `/prompt-runner` to open the game, even while Claude is working. Run it again, or press Esc, to put the game away and get your prompt back.
 
+The game opens in a pane. On the regular screen it sits above the prompt. In fullscreen mode, a terminal at least 110 columns wide shows it beside the transcript instead. Claude Code picks the spot, not the plugin.
+
 Once the game is open, there is one button. It jumps, and it starts the next run after a crash.
 
 - **Keyboard:** Space
 - **Mouse or touch:** click or tap anywhere on the game
+
+If you were typing in the prompt when the game opened, the keyboard stays with the prompt. The game pauses until you click it or press `ctrl+x tab`, so Space doesn't type spaces into your message. The same thing happens whenever you switch back to the prompt in the middle of a run.
 
 Your best score is saved between sessions.
 
