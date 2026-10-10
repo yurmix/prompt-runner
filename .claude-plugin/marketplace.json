@@ -1,0 +1,13 @@
+{
+  "name": "prompt-runner",
+  "description": "Claude Run, an endless-runner game for Claude Code",
+  "owner": {
+    "name": "Eyal Yurman"
+  },
+  "plugins": [
+    {
+      "name": "prompt-runner",
+      "source": "./"
+    }
+  ]
+}

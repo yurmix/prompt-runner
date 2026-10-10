@@ -1,0 +1,8 @@
+{
+  "name": "prompt-runner",
+  "version": "0.1.0",
+  "description": "Claude Run: an endless-runner game above the prompt. Jump Claude over bugs and duck under hallucination moths.",
+  "author": { "name": "Eyal Yurman" },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
